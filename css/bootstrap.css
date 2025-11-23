@@ -61,7 +61,7 @@ dfn {
   font-style: italic;
 }
 h1 {
-  margin: .67em 0;
+  margin: .50em 0;
   font-size: 2em;
 }
 mark {
@@ -166,7 +166,7 @@ input[type="search"]::-webkit-search-decoration {
   -webkit-appearance: none;
 }
 fieldset {
-  padding: .35em .625em .75em;
+  padding: .50em .800em .9em;
   margin: 0 2px;
   border: 1px solid #c0c0c0;
 }
