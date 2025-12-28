@@ -501,6 +501,15 @@ nav a:hover::before {
 	margin-right: 15px;
 }
 
+.third-content .third-section .left-content {
+	margin-right: 15px;
+	margin-top: 12px;
+}
+
+.third-content .third-section .right-image {
+	margin-left: 15px;
+}
+
 .third-content h2 {
 	font-size: 24px;
 	text-transform: uppercase;
@@ -763,6 +772,16 @@ nav a:hover::before {
 		margin-right: 0px;
 	}
 
+	.third-content .third-section .left-content {
+		margin-left: 0px;
+		margin-top: 30px;
+	}
+
+
+	.third-content .third-section .right-image {
+		margin-right: 0px;
+	}
+
 	.fifth-content #map {
 		padding: 30px 30px 30px 30px;
 	}
@@ -845,4 +864,5 @@ nav a:hover::before {
 	nav a {
 	  	padding: 15px 20px;
 	}
+
 }
