@@ -1,0 +1,125 @@
+/*check that data imported correctly. using sqlite studio instead of sql so there will be some discrepancies in coding language*/
+SELECT * FROM parks;
+SELECT * FROM species LIMIT 10;
+
+/*join tables to check data*/
+SELECT s.[Species ID], s.Category, s.[Common Names], s.[Conservation Status], p.* FROM species s
+LEFT JOIN parks p on s.[Park Name] = p.[Park Name]
+LIMIT 10;
+
+/*find states with most parks*/
+SELECT State, COUNT([Park Code]) AS park_count
+FROM parks
+GROUP BY State
+ORDER BY park_count desc;
+
+/*sort by largest acreage*/
+SELECT * FROM parks
+ORDER BY CAST(Acres as REAL) desc;
+
+/*find park with most endangered species (species of concern, threatened, proposed endangered)--------------------------------------------*/
+/*start with testing case when clause*/
+SELECT [Park Name],
+CASE WHEN [Conservation Status] = 'Endangered' 
+OR [Conservation Status] = 'Species of Concern'
+OR [Conservation Status] = 'Threatened'
+OR [Conservation Status] = 'Proposed Endangered' THEN 1
+WHEN [Conservation Status] = 'In Recovery' THEN 2
+ELSE 0
+END
+FROM SPECIES LIMIT 100;
+
+ALTER TABLE species
+ADD endangered integer;
+
+/*update table for endangered*/
+UPDATE species
+SET endangered = CASE 
+WHEN [Conservation Status] = 'Endangered' 
+OR [Conservation Status] = 'Species of Concern'
+OR [Conservation Status] = 'Threatened'
+OR [Conservation Status] = 'Proposed Endangered' THEN 1
+ELSE 0
+END;
+
+ALTER TABLE species
+ADD inrecovery integer;
+
+/*update for in recovery*/
+UPDATE species
+SET inrecovery = CASE 
+WHEN [Conservation Status] = 'In Recovery' THEN 1
+ELSE 0
+END;
+
+SELECT * FROM species LIMIT 100;
+
+/*count each status and find percentages using CTE*/
+WITH endangered_table AS
+(SELECT [Park Name], SUM(endangered) AS no_endangered, SUM(inrecovery) as no_inrecovery, COUNT([Species ID]) AS total_species
+FROM species
+GROUP BY [Park Name]
+)
+SELECT [Park Name], no_endangered, no_inrecovery, total_species, CAST(no_endangered AS REAL)/total_species AS endangered_percent, CAST(no_inrecovery AS REAL)/total_species AS recovery_percent
+FROM endangered_table
+ORDER BY endangered_percent desc;
+
+/*find biodiversity and ratio to acres for each park with CTE, creating temp table*/
+DROP TABLE if exists bio_table;
+CREATE TABLE bio_table
+(
+parkcode nvarchar(4),
+parkname nvarchar(100),
+state nvarchar(2),
+acres numeric,
+biodiversity numeric,
+bio_ratio numeric);
+
+WITH bio_query AS (
+SELECT p.[Park Code], p.[Park Name], p.State, p.Acres, COUNT(s.[Species ID]) as Biodiversity 
+FROM species s
+LEFT JOIN parks p on s.[Park Name] = p.[Park Name]
+GROUP BY p.[Park Code], p.[Park Name], p.State, p.Acres
+)
+INSERT INTO bio_table(parkcode, parkname, state, acres, biodiversity, bio_ratio)
+SELECT [Park Code], [Park Name], State, Acres, Biodiversity, CAST(Biodiversity as REAL)/Acres AS bio_ratio
+FROM bio_query;
+
+SELECT * FROM bio_table;
+
+/*another version - sqlite friendly*/
+DROP TABLE if exists bio_table;
+CREATE TABLE bio_table
+(
+    parkcode TEXT,
+    parkname TEXT,
+    state TEXT,
+    acres REAL,
+    biodiversity INTEGER,
+    bio_ratio REAL
+);
+
+INSERT INTO bio_table(parkcode, parkname, state, acres, biodiversity, bio_ratio)
+SELECT 
+    p.[Park Code], 
+    p.[Park Name], 
+    p.State, 
+    p.Acres, 
+    COUNT(s.[Species ID]) AS Biodiversity,
+    CAST(COUNT(s.[Species ID]) AS REAL) / p.Acres AS bio_ratio
+FROM parks p
+LEFT JOIN species s ON s.[Park Name] = p.[Park Name]
+GROUP BY p.[Park Code];
+
+SELECT * FROM bio_table;
+
+/*see just tx parks*/
+SELECT * FROM bio_table
+WHERE state = 'TX'; 
+
+/*find highest biodiversity parks*/
+SELECT * FROM bio_table
+ORDER BY biodiversity desc;
+
+SELECT * FROM bio_table
+ORDER BY bio_ratio desc;
