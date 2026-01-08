@@ -1,0 +1,98 @@
+/*pulling data from the cloud database - all of us researcher workbench, an NIH initiative*/
+proc sql;
+connect to bigquery (PROJECT="&googleproject." schema="&workspacecdr." mode='Performance');
+create table
+measurement_28643717 as
+select * from connection to bigquery
+(
+SELECT
+measurement.person_id,
+m_standard_concept.concept_name as standard_concept_name,
+measurement.measurement_datetime,
+measurement.measurement_type_concept_id,
+m_type.concept_name as measurement_type_concept_name,
+measurement.value_as_number
+FROM
+( SELECT
+*
+FROM
+`&workspacecdr..measurement` measurement
+WHERE
+(
+measurement_concept_id IN (SELECT
+DISTINCT c.concept_id
+FROM
+`&workspacecdr..cb_criteria` c
+JOIN
+(SELECT
+CAST(cr.id as string) AS id
+FROM
+`&workspacecdr..cb_criteria` cr
+WHERE
+concept_id IN (3013707, 3020460)
+AND full_text LIKE '%_rank1]%' ) a
+ON (c.path LIKE CONCAT('%.', a.id, '.%')
+OR c.path LIKE CONCAT('%.', a.id)
+OR c.path LIKE CONCAT(a.id, '.%')
+OR c.path = a.id)
+WHERE
+is_standard = 1
+AND is_selectable = 1)
+)) measurement
+LEFT JOIN
+`&workspacecdr..concept` m_standard_concept
+ON measurement.measurement_concept_id = m_standard_concept.concept_id
+LEFT JOIN
+`&workspacecdr..concept` m_type
+ON measurement.measurement_type_concept_id = m_type.concept_id );
+
+disconnect from bigquery;
+quit;
+
+/*renaming inflammatory biomarkers and removing any measurements before the neighborhood environment survey date*/
+data renamed;
+set work.measurement_28643717;
+if (standard_concept_name = 'Erythrocyte sedimentation rate by Westergren method') then concept = 'esr';
+if (standard_concept_name = 'C reactive protein [Mass/volume] in Serum or Plasma') then concept = 'crep';
+if measurement_datetime < '03NOV2020:22:13:35'dt then delete;
+run;
+
+proc sort data = work.renamed;
+by person_id;
+run;
+
+/*if there are multiple measurements for one participant, set the date collected to be all the same (latest). This is done so in the next step, when the average of the measurements is taken, the latest date collected
+is kept*/
+proc sql;
+create table dep_max as
+select *
+from work.renamed
+group by person_id, concept
+having measurement_datetime = max(measurement_datetime);
+quit;
+
+/*averaging multiples*/
+proc sql;
+create table dep_avg as
+select distinct *
+from work.dep_max
+group by person_id, concept
+having value_as_number = mean(value_as_number);
+quit;
+
+proc transpose data = work.dep_avg out = val_trans (rename=(esr=esr_val cre=cre_val));
+by person_id;
+id concept;
+var value_as_number;
+run;
+
+proc transpose data=work.dep_avg out=time_trans (rename=(esr=esr_time cre=cre_time));
+by person_id;
+id concept;
+var measurement_datetime;
+run;
+
+data timetable;
+merge val_trans time_trans;
+by person_id;
+run;
